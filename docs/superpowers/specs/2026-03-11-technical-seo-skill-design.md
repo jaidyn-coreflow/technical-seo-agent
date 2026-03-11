@@ -126,6 +126,7 @@ When triggered, the skill follows this process:
 | `read_crawl_data` returns empty results | Report "no issues found" for that category — this is a valid result, not an error. |
 | MCP server not configured | Tell user to install and configure the screaming-frog-mcp server. Stop. |
 | Very large result set (>500 rows) | Summarize with counts and patterns, show top 20 sample URLs, offer to show more on request. |
+| Exported CSV not found | SF MCP auto-deletes exports after 1 hour. Re-export the data and retry. |
 
 ### Pagination Strategy
 
@@ -358,5 +359,6 @@ If the `google-ranking-signals` plugin is installed, it provides complementary c
 ## Open Questions (to resolve during implementation)
 
 - **Export tab names**: Exact Screaming Frog export tab/bulk export names need verification against the MCP server. Resolved by: testing each mapping with a real crawl during implementation.
+- **`read_crawl_data` filter syntax**: The exact parameter names, filter operators, and pagination fields accepted by `read_crawl_data` need to be verified against the MCP server during implementation. The export-mappings file will be updated with concrete filter examples once confirmed.
 - **Report file saving**: Audit reports are presented inline. Saving to file only when the user asks (e.g., "save this report"). No auto-save.
 - **Crawl comparison**: Deferred to a future version. V1 analyzes a single crawl only.
