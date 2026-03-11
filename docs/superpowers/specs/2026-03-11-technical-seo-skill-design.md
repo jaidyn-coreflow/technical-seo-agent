@@ -18,19 +18,32 @@ A Claude Code skill that acts as a trained technical SEO specialist. The user (S
 
 ## Data Source
 
-The skill consumes crawl data exclusively through the [Screaming Frog MCP server](https://github.com/bzsasson/screaming-frog-mcp). It does NOT trigger crawls — the user runs crawls in the Screaming Frog GUI beforehand.
+The skill consumes crawl data exclusively through the [Screaming Frog MCP server](https://github.com/bzsasson/screaming-frog-mcp). It does NOT trigger crawls — the user runs crawls in the Screaming Frog GUI beforehand for maximum control (custom extraction, JavaScript rendering, crawl config).
 
 ### MCP Tools Used
 
 | Tool | Purpose |
 |------|---------|
+| `sf_check` | Verify SF installation, version, and license before proceeding |
 | `list_crawls` | Show available crawls, let user pick one |
 | `export_crawl` | Pull specific data tabs/reports from a crawl |
 | `read_crawl_data` | Read exported CSV files with filtering/pagination |
 
-### Prerequisite
+### MCP Tools NOT Used
 
-The Screaming Frog GUI must be **closed** before the skill can access crawl data (the internal database permits only single-process access).
+| Tool | Reason |
+|------|--------|
+| `crawl_site` | User runs crawls in the GUI for full control over crawl config, custom extraction, and JS rendering. Headless crawls use default settings only. |
+| `crawl_status` | Not needed since we don't initiate crawls |
+| `delete_crawl` | Destructive action — user manages their own crawl storage |
+| `storage_summary` | Informational only, not needed for analysis |
+
+### Prerequisites
+
+1. Screaming Frog SEO Spider installed (v16+, paid license recommended)
+2. Screaming Frog MCP server installed and configured in Claude Code
+3. A completed crawl saved in SF
+4. The Screaming Frog GUI must be **closed** before the skill can access crawl data (the internal database permits only single-process access)
 
 ## File Structure
 
@@ -74,28 +87,53 @@ Auto-invokes on phrases like: "audit this crawl", "check SEO", "show me 404s", "
 
 When triggered, the skill follows this process:
 
-1. **Identify the crawl**
+1. **Preflight check**
+   - Call `sf_check` to verify Screaming Frog is installed and licensed
+   - If SF is not found or the GUI is still open, tell the user what to fix and stop
+
+2. **Identify the crawl**
    - Call `list_crawls` to show available crawls
+   - If no crawls found, tell user to run a crawl in the SF GUI first and stop
    - If only one crawl exists, auto-select it
    - If multiple, present options and let user pick
 
-2. **Understand the ask**
+3. **Understand the ask**
    - **Ad-hoc query**: User asks about a specific issue (e.g., "show me 404s", "which pages have low inlinks")
    - **Full audit**: User asks for a broad analysis (e.g., "audit this crawl", "run a full technical SEO check")
 
-3. **Export the right data**
+4. **Export the right data**
    - Consult `references/export-mappings.md` to determine which `export_crawl` tabs, bulk exports, and reports to pull
    - Ad-hoc: export only the specific tab(s) needed
    - Full audit: export all relevant tabs across all SEO domains
 
-4. **Read and analyze**
+5. **Read and analyze**
    - Use `read_crawl_data` with appropriate filters to read exported CSVs
    - Read the relevant `references/*.md` file(s) for domain expertise
    - Apply SEO knowledge to interpret the data — identify issues, assess severity, determine root causes
 
-5. **Present findings**
+6. **Present findings**
    - **Ad-hoc queries**: Conversational response with data tables, interpretation, and recommended actions
    - **Full audits**: Structured markdown report (see Report Format below)
+
+### Error Handling
+
+| Scenario | Behavior |
+|----------|----------|
+| SF not installed / `sf_check` fails | Tell user to install Screaming Frog and the MCP server. Stop. |
+| SF GUI still open (database locked) | Tell user to close the Screaming Frog application. Stop. |
+| No crawls found | Tell user to run a crawl in the SF GUI first. Stop. |
+| `export_crawl` fails (invalid tab name) | Log the error, skip that tab, continue with remaining exports. Note the skipped data in output. |
+| `read_crawl_data` returns empty results | Report "no issues found" for that category — this is a valid result, not an error. |
+| MCP server not configured | Tell user to install and configure the screaming-frog-mcp server. Stop. |
+| Very large result set (>500 rows) | Summarize with counts and patterns, show top 20 sample URLs, offer to show more on request. |
+
+### Pagination Strategy
+
+For large crawls, the skill handles data volume as follows:
+
+- **Ad-hoc queries**: Use `read_crawl_data` filtering to pull only relevant rows. Show up to 20 sample URLs in the response. If more exist, state the total count and offer to show more.
+- **Full audits**: For each issue category, report total affected page count and percentage. Show up to 10 sample URLs per issue in the report. Group by URL pattern when possible (e.g., "42 URLs under `/blog/2023/`").
+- **Pagination**: Use `read_crawl_data`'s page/row parameters to read data in chunks if needed. Never attempt to load an entire large export into a single response.
 
 ### Smart Query Handling
 
@@ -168,6 +206,8 @@ Covers schema/structured data issues:
 - **Incomplete schema**: Required properties missing for specific schema types
 - **Mismatched schema**: Schema type doesn't match page intent (e.g., Article schema on a product page)
 
+> Note: Structured data analysis depends on whether Screaming Frog's "Structured Data" tab is available in the crawl export. If the crawl was not configured to extract structured data, the skill should note this gap and recommend enabling it for future crawls rather than silently skipping it.
+
 ### export-mappings.md
 
 The critical mapping file that translates SEO queries into Screaming Frog MCP parameters. Structure:
@@ -188,9 +228,36 @@ The critical mapping file that translates SEO queries into Screaming Frog MCP pa
 |---------------|------------|-------------|-------------|
 | Missing titles | Page Titles:Missing | — | — |
 | Duplicate titles | Page Titles:Duplicate | — | — |
+| Long titles | Page Titles:Over 60 Characters | — | — |
+| Missing meta descriptions | Meta Description:Missing | — | — |
+| Duplicate meta descriptions | Meta Description:Duplicate | — | — |
 | Missing H1 | H1:Missing | — | — |
+| Multiple H1s | H1:Multiple | — | — |
+| Duplicate H1s | H1:Duplicate | — | — |
 | Canonicals | Canonicals:All | — | — |
-...
+| Directives, noindex | Directives:All | — | — |
+| Hreflang | Hreflang:All | — | — |
+| Images, alt text | Images:All | — | — |
+
+### Link Structure
+| Query pattern | export_tabs | bulk_export | save_report |
+|---------------|------------|-------------|-------------|
+| Internal links, inlinks | — | All Inlinks | — |
+| Outlinks | — | All Outlinks | — |
+| Broken links | Response Codes:Client Error (4xx) | All Inlinks | — |
+
+### Performance
+| Query pattern | export_tabs | bulk_export | save_report |
+|---------------|------------|-------------|-------------|
+| Response time, slow pages | Internal:All | — | — |
+| Page size, large pages | Internal:All | — | — |
+
+### Structured Data
+| Query pattern | export_tabs | bulk_export | save_report |
+|---------------|------------|-------------|-------------|
+| Schema, structured data | Structured Data:All | — | — |
+
+> Note: Structured data export availability depends on SF version and crawl config. If the tab is not available, the skill should report that structured data was not captured in this crawl and suggest enabling it in SF settings.
 
 ### Full Audit
 | export_tabs | bulk_export | save_report |
@@ -276,15 +343,9 @@ For comprehensive audits, generate a markdown report:
 }
 ```
 
-### Prerequisites
-
-1. Screaming Frog SEO Spider installed (v16+, paid license recommended)
-2. Screaming Frog MCP server installed and configured in Claude Code
-3. A completed crawl with the SF GUI closed
-
 ### Complementary Skills
 
-The `google-ranking-signals` skill is already installed and covers Google's ranking signal analysis. The technical-seo skill is complementary — it focuses on identifying issues from crawl data, while google-ranking-signals provides context on how Google evaluates and ranks pages.
+If the `google-ranking-signals` plugin is installed, it provides complementary context on how Google evaluates and ranks pages. The technical-seo skill focuses on identifying issues from crawl data; google-ranking-signals provides the "why it matters" from Google's perspective. They are independent — neither requires the other.
 
 ## Success Criteria
 
@@ -294,8 +355,8 @@ The `google-ranking-signals` skill is already installed and covers Google's rank
 4. Recommendations are specific and actionable, not generic SEO advice
 5. The skill handles large crawls gracefully (pagination, filtering, summarization)
 
-## Open Questions
+## Open Questions (to resolve during implementation)
 
-- Exact Screaming Frog export tab names need verification against the MCP server during implementation
-- Whether the skill should save audit reports to a file automatically or only when asked
-- Whether to support comparing two crawls (before/after analysis) in v1 or defer to a future version
+- **Export tab names**: Exact Screaming Frog export tab/bulk export names need verification against the MCP server. Resolved by: testing each mapping with a real crawl during implementation.
+- **Report file saving**: Audit reports are presented inline. Saving to file only when the user asks (e.g., "save this report"). No auto-save.
+- **Crawl comparison**: Deferred to a future version. V1 analyzes a single crawl only.
