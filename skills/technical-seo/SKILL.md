@@ -6,7 +6,7 @@ description: >
   find orphan pages, check crawl data, show broken links, analyze page titles,
   check meta descriptions, find thin content, check schema markup, review canonicals,
   analyze crawl depth, check hreflang, find duplicate content, review directives,
-  or any Screaming Frog crawl analysis task.
+  show me pages with, or any Screaming Frog crawl analysis task.
 user-invokable: true
 args:
   - name: query
@@ -119,6 +119,8 @@ If a result set has more than 500 rows:
 **Pagination:** Use `read_crawl_data`'s pagination parameters to read large exports in chunks. Never attempt to load an entire large export into a single call.
 
 **If a CSV is not found when calling `read_crawl_data`:** The Screaming Frog MCP server auto-deletes exported CSVs after 1 hour. Re-call `export_crawl` to regenerate the file, then retry `read_crawl_data`.
+
+**If `read_crawl_data` returns empty results:** This is a valid result, not an error. Report "no issues found" for that category. For ad-hoc queries: "No [issue type] found in this crawl." For full audits: omit the category from the report (no need to list categories with zero issues).
 
 **Applying SEO judgment:**
 - Identify issues, assess severity, determine likely root causes
