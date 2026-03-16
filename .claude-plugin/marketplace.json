@@ -1,0 +1,22 @@
+{
+  "name": "technical-seo",
+  "owner": {
+    "name": "jaidynl"
+  },
+  "metadata": {
+    "description": "Technical SEO specialist skill for analyzing Screaming Frog crawl data"
+  },
+  "plugins": [
+    {
+      "name": "technical-seo",
+      "source": "./",
+      "description": "Technical SEO specialist skill for analyzing Screaming Frog crawl data via MCP. Audits crawls, identifies issues, and provides actionable recommendations.",
+      "version": "1.0.0",
+      "author": {
+        "name": "jaidynl"
+      },
+      "category": "productivity",
+      "tags": ["seo", "technical-seo", "screaming-frog", "crawl-analysis"]
+    }
+  ]
+}

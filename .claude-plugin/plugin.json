@@ -1,0 +1,6 @@
+{
+  "name": "technical-seo",
+  "description": "Technical SEO specialist skill for analyzing Screaming Frog crawl data",
+  "version": "1.0.0",
+  "skills": "./skills"
+}
