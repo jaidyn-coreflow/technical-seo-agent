@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "screaming-frog": {
+      "type": "stdio",
+      "command": "uvx",
+      "args": [
+        "screaming-frog-mcp"
+      ],
+      "env": {
+        "SF_CLI_PATH": "/Applications/Screaming Frog SEO Spider.app/Contents/MacOS/ScreamingFrogSEOSpiderLauncher"
+      }
+    }
+  }
+}
